@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">AnimalsInDanger</string>
     <string name="animals_in_danger">Animals In Danger</string>
+    <string name="search_animals">Search Animals</string>
+    <string name="geolocate">Geolocate</string>
+    <string name="worldmap">WorldMap</string>
+    <string name="backbutton">backButton</string>
 </resources>
