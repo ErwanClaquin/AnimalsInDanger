@@ -8,22 +8,16 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.os.Bundle
 import android.provider.BaseColumns
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageButton
-import android.widget.ImageView
-import android.widget.TextView
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import androidx.room.PrimaryKey
 import com.example.animalsindanger.MainActivity.Companion.lastActivity
+
 
 class SearchAnimalsActivity : AppCompatActivity() {
     private lateinit var buttonReturn: ImageButton
     private val dbHelper = FeedReaderDbHelper(this)
-
+    private lateinit var listView: ListView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,8 +26,20 @@ class SearchAnimalsActivity : AppCompatActivity() {
         buttonReturn.setOnClickListener {
             setLastView()
         }
+        println("\nTABLE CREATING ...")
         fillTable()
-        getAllTable()
+        listView = findViewById(R.id.animal_list_view)
+        val animalList = getAllTable()
+
+        val listItems = arrayOfNulls<String>(animalList.size)
+
+        for (i in animalList.indices) {
+            val animal = animalList[i]
+
+            listItems[i] = animal.name
+        }
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, listItems)
+        listView.adapter = adapter
     }
 
     private fun setLastView() {
@@ -49,6 +55,8 @@ class SearchAnimalsActivity : AppCompatActivity() {
 
     private fun fillTable() {
         val db = dbHelper.writableDatabase
+        db.execSQL(SQL_DELETE_ENTRIES)
+        db.execSQL(SQL_CREATE_ENTRIES)
         val values = ContentValues().apply {
             put(FeedReaderContract.FeedEntry.NAME, "Le grand requin blanc")
             put(FeedReaderContract.FeedEntry.HABITAT, "eaux tempérées")
@@ -62,27 +70,40 @@ class SearchAnimalsActivity : AppCompatActivity() {
         val newRowId = db?.insert(FeedReaderContract.FeedEntry.TABLE_NAME, null, values)
     }
 
-    private fun getAllTable() {
-        val db = dbHelper.readableDatabase
-        val sortOrder = "${FeedReaderContract.FeedEntry.NAME} DESC"
+    private fun getAllTable(): List<Specie> {
+        return dbHelper.readableDatabase.use { it ->
+            dbHelper.readableDatabase
+            val cursor =
+                it.rawQuery("SELECT * FROM ${FeedReaderContract.FeedEntry.TABLE_NAME}", null)
+            val species = arrayListOf<Specie>()
+            if (!cursor.moveToFirst()) return@use species
+            cursor.use {
+                while (!it.isAfterLast) {
+                    println("Create Animal")
+                    val animal = Specie(
+                        it.getString(1).toString(),
+                        it.getString(2).toString(),
+                        it.getInt(3),
+                        it.getFloat(4),
+                        it.getString(5).toString(),
+                        it.getString(6).toString(),
+                        it.getString(7)!!.toBoolean(),
+                        it.getFloat(8)
+                    )
+                    println("Add Animal")
+                    species.add(animal)
+                    it.moveToNext()
+                }
 
-        val cursor = db.query(
-            FeedReaderContract.FeedEntry.TABLE_NAME,   // The table to query
-            null,             // The array of columns to return (pass null to get all)
-            null,              // The columns for the WHERE clause
-            null,          // The values for the WHERE clause
-            null,                   // don't group the rows
-            null,                   // don't filter by row groups
-            sortOrder               // The sort order
-        )
+            }
 
-        print(cursor)
+            return@use species
+        }
     }
-
-
 }
 
-class Specie(
+
+data class Specie(
     var name: String,
     var habitat: String,
     var number: Int,
@@ -94,39 +115,6 @@ class Specie(
 ) {
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0
-}
-
-
-class AnimalViewHolder(inflater: LayoutInflater, parent: ViewGroup) :
-    RecyclerView.ViewHolder(inflater.inflate(R.layout.search_animals, parent, false)) {
-
-    private var nameView: TextView? = null
-    private var imageView: ImageView? = null
-
-    init {
-        nameView = itemView.findViewById(R.id.fragment_main_animal_title)
-        imageView = itemView.findViewById(R.id.fragment_main_animal_image)
-    }
-
-    fun bind(animal: Specie) {
-        nameView?.text = animal.name
-        //Todo:image in bdd?
-    }
-}
-
-class ListAdapter(private val list: List<Specie>) : RecyclerView.Adapter<AnimalViewHolder>() {
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AnimalViewHolder {
-        val inflater = LayoutInflater.from(parent.context)
-        return AnimalViewHolder(inflater, parent)
-    }
-
-    override fun onBindViewHolder(holder: AnimalViewHolder, position: Int) {
-        val movie: Specie = list[position]
-        holder.bind(movie)
-    }
-
-    override fun getItemCount(): Int = list.size
-
 }
 
 object FeedReaderContract {
@@ -160,8 +148,10 @@ private const val SQL_CREATE_ENTRIES =
 private const val SQL_DELETE_ENTRIES =
     "DROP TABLE IF EXISTS ${FeedReaderContract.FeedEntry.TABLE_NAME}"
 
-class FeedReaderDbHelper(context: Context) : SQLiteOpenHelper(context, "FeedReader.db", null, 1) {
+class FeedReaderDbHelper(context: Context) :
+    SQLiteOpenHelper(context, "FeedReader.db", null, 1) {
     override fun onCreate(db: SQLiteDatabase) {
+        println("OnCreate FeedReaderDbHelper")
         db.execSQL(SQL_CREATE_ENTRIES)
     }
 
